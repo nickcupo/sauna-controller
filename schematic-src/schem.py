@@ -105,80 +105,93 @@ def jog(d, a, b, x, color=SIG):
     """Orthogonal wire a -> b with the vertical segment at x."""
     line(d, a, (x, a.y), (x, b.y), b, color=color)
 
+def tag_out(d, at, text, w=1.5):
+    """Net label leaving a pin to the right."""
+    t = d.add(elm.Tag(width=w).at(at).right().label(text, fontsize=8.5, color=SIG).color(SIG))
+    return t
+
+def tag_in(d, at, text, w=1.5):
+    """Net label arriving at a pin from the left."""
+    t = d.add(elm.Tag(width=w).at(at).left().label(text, fontsize=8.5, color=SIG).color(SIG))
+    return t
+
 def sauna():
     d = new()
     esp = d.add(box('ESP32 DevKit', (3.8, 8.8), left=['VIN', '3V3', 'GND'],
                     right=['GPIO15', 'GPIO21', 'GPIO22', 'GPIO25', 'GPIO26', 'GPIO27', 'GPIO12', 'GPIO13', 'GPIO14'], spacing=0.85).at((0, 0)))
     v5(d, P(esp, 'VIN')); gnd(d, P(esp, 'inL1'))
     t = P(esp, '3V3'); line(d, t, (t.x - 1.0, t.y)); v33(d, (t.x - 1.0, t.y))
-    # Peripherals stacked in the same order as the ESP pins. Supply pin on top, ground at the bottom.
-    ds = d.add(box('DS18B20 probe', (3.0, 2.4), left=['VDD', 'DQ', 'GND'], spacing=0.7).at((9.0, 8.0)))
-    oled = d.add(box('SSD1306 OLED, I²C', (3.0, 2.9), left=['VCC', 'SDA', 'SCL', 'GND'], spacing=0.7).at((9.0, 4.0)))
-    enc = d.add(box('KY-040 rotary encoder', (3.0, 3.6), left=['+', 'CLK', 'DT', 'SW', 'GND'], spacing=0.7).at((9.0, -0.8)))
-    rly = d.add(box('Relay module, 3 ch, 10 A', (5.0, 5.6), left=['VCC', 'IN1', 'IN2', 'IN3', 'GND'], right=['NO1', 'NO2', 'NO3'], bottom=['COM1', 'COM2', 'COM3'], spacing=1.0).at((9.0, -7.2)))
+    nets = {'GPIO15': '1-WIRE', 'GPIO21': 'SDA', 'GPIO22': 'SCL', 'GPIO25': 'ENC_A', 'GPIO26': 'ENC_B', 'GPIO27': 'ENC_SW', 'GPIO12': 'RLY1', 'GPIO13': 'RLY2', 'GPIO14': 'RLY3'}
+    for pin, net in nets.items():
+        tag_out(d, P(esp, pin), net)
+    # Peripherals, each wired by net name. Supply pin on top, ground at the bottom.
+    X = 10.0
+    ds = d.add(box('DS18B20 probe', (3.0, 2.4), left=['VDD', 'DQ', 'GND'], spacing=0.7).at((X, 7.6)))
+    oled = d.add(box('SSD1306 OLED, I²C', (3.0, 2.9), left=['VCC', 'SDA', 'SCL', 'GND'], spacing=0.7).at((X, 3.6)))
+    enc = d.add(box('KY-040 rotary encoder', (3.0, 3.6), left=['+', 'CLK', 'DT', 'SW', 'GND'], spacing=0.7).at((X, -1.2)))
+    # Three single relay modules. Each one only breaks the hot line to its pair of bulbs.
+    relays = []
+    for i in range(3):
+        y = -5.2 - i * 3.0
+        r = d.add(box(f'Relay {i+1}, 5 V coil, 10 A', (3.4, 2.2), left=['VCC', 'IN', 'GND'], right=['COM', 'NO'], spacing=0.7).at((X, y)))
+        v5(d, P(r, 'VCC')); gnd(d, P(r, 'GND')); tag_in(d, P(r, 'IN'), f'RLY{i+1}')
+        relays.append(r)
     v33(d, P(ds, 'VDD')); gnd(d, P(ds, 'GND'))
     v33(d, P(oled, 'VCC')); gnd(d, P(oled, 'GND'))
     v33(d, P(enc, '+')); gnd(d, P(enc, 'GND'))
-    v5(d, P(rly, 'VCC')); gnd(d, P(rly, 'GND'))
-    # 1-Wire with the pull-up tied to the probe's VDD net
-    dq, vdd = P(ds, 'DQ'), P(ds, 'VDD'); g15 = P(esp, 'GPIO15')
-    jog(d, g15, dq, 6.2)
-    node = (7.4, dq.y); dot(d, node)
-    r = d.add(elm.Resistor().endpoints(node, (node[0], vdd.y)).label('R1  4.7 kΩ', fontsize=8.5, loc='left', ofst=0.35))
+    # 1-Wire: net label, then the local pull-up to the probe's VDD net
+    dq, vdd = P(ds, 'DQ'), P(ds, 'VDD')
+    node = (dq.x - 1.0, dq.y)
+    line(d, dq, node, color=SIG); dot(d, node)
+    line(d, node, (dq.x - 2.6, dq.y), color=SIG)
+    tag_in(d, (dq.x - 2.6, dq.y), '1-WIRE')
+    r1 = d.add(elm.Resistor().endpoints(node, (node[0], vdd.y)).label('R1  4.7 kΩ', fontsize=8.5, loc='left', ofst=0.35))
     line(d, (node[0], vdd.y), vdd); dot(d, (vdd.x, vdd.y))
-    # I²C, encoder, relay inputs
-    jog(d, P(esp, 'GPIO21'), P(oled, 'SDA'), 6.6)
-    jog(d, P(esp, 'GPIO22'), P(oled, 'SCL'), 6.2)
-    jog(d, P(esp, 'GPIO25'), P(enc, 'CLK'), 7.0)
-    jog(d, P(esp, 'GPIO26'), P(enc, 'DT'), 6.6)
-    jog(d, P(esp, 'GPIO27'), P(enc, 'SW'), 6.2)
-    jog(d, P(esp, 'GPIO12'), P(rly, 'IN1'), 7.0)
-    jog(d, P(esp, 'GPIO13'), P(rly, 'IN2'), 6.6)
-    jog(d, P(esp, 'GPIO14'), P(rly, 'IN3'), 6.2)
-    # Mains: COMs drop to an L bus, each NO feeds two 250 W lamps to N
-    coms = [P(rly, 'COM1'), P(rly, 'COM2'), P(rly, 'COM3')]
-    nos = [P(rly, 'NO1'), P(rly, 'NO2'), P(rly, 'NO3')]
-    ly = coms[0].y - 0.9; nx = 20.4
-    line(d, (coms[0].x, ly), (nx, ly), color=MAINS)
+    tag_in(d, P(oled, 'SDA'), 'SDA'); tag_in(d, P(oled, 'SCL'), 'SCL')
+    tag_in(d, P(enc, 'CLK'), 'ENC_A'); tag_in(d, P(enc, 'DT'), 'ENC_B'); tag_in(d, P(enc, 'SW'), 'ENC_SW')
+    # Mains: one hot line feeds every COM; each NO goes through its bulb pair to neutral.
+    coms = [P(r, 'COM') for r in relays]; nos = [P(r, 'NO') for r in relays]
+    lx = coms[0].x + 0.9; nx = coms[0].x + 6.2
+    line(d, (lx, coms[0].y + 1.2), (lx, coms[-1].y), color=MAINS)
+    d.add(elm.Label().at((lx, coms[0].y + 1.35)).label('L  120 V AC in', fontsize=9, color=MAINS, halign='center', valign='bottom'))
     for c in coms:
-        line(d, c, (c.x, ly), color=MAINS); dot(d, (c.x, ly))
-    d.add(elm.Label().at((coms[0].x - 0.2, ly - 0.15)).label('L  120 V AC', fontsize=9, color=MAINS, halign='left', valign='top'))
-    line(d, (nx, ly), (nx, nos[0].y), color=MAINS); dot(d, (nx, ly))
-    d.add(elm.Label().at((nx, nos[0].y + 0.15)).label('N', fontsize=9, color=MAINS, halign='center', valign='bottom'))
+        line(d, c, (lx, c.y), color=MAINS); dot(d, (lx, c.y))
+    line(d, (nx, coms[0].y + 1.2), (nx, nos[-1].y), color=MAINS)
+    d.add(elm.Label().at((nx, coms[0].y + 1.35)).label('N', fontsize=9, color=MAINS, halign='center', valign='bottom'))
     for i, n in enumerate(nos):
-        lamp = d.add(elm.Lamp().at(n).right().length(1.8).scale(0.75).color(MAINS))
+        line(d, n, (lx + 0.6, n.y), color=MAINS)
+        lamp = d.add(elm.Lamp().at((lx + 0.6, n.y)).right().length(1.8).scale(0.75).color(MAINS))
         line(d, lamp.end, (nx, n.y), color=MAINS); dot(d, (nx, n.y))
-        d.add(elm.Label().at((lamp.end.x + 0.3, n.y + 0.1)).label(f'bulbs {2*i+1} + {2*i+2},  2 × 250 W', fontsize=8, halign='left', valign='bottom', color=MAINS))
-    d.add(elm.Label().at((9.0, ly - 0.9)).label(
+        d.add(elm.Label().at((lamp.end.x + 0.25, n.y + 0.1)).label(f'bulbs {2*i+1} + {2*i+2},  2 × 250 W', fontsize=8, halign='left', valign='bottom', color=MAINS))
+    d.add(elm.Label().at((X, coms[-1].y - 2.0)).label(
+        'Each relay interrupts only the hot line to its pair of bulbs; neutral runs straight to the bulbs.\n'
         'Mains side: 14 AWG, grounded metal enclosure, breaker sized for the 12.6 A total.\n'
         'Keep it physically apart from the 3.3 V wiring.', fontsize=8.5, halign='left', valign='top', color=MAINS))
-    note(d, (0, -8.2),
-         'Staged thermostat: 1, 2, or 3 relays on depending on how far below\n'
-         'the setpoint the room is. 2 °F deadband, 15 s minimum on/off per\n'
-         'bank, wear leveling by cycle count and runtime. The encoder button\n'
-         'uses the internal pull-up. Firmware in PlatformIO and ESPHome forms.')
+    note(d, (0, -3.0),
+         'Signals are shown as net labels: a tag on an ESP pin connects\n'
+         'to the tag of the same name on the peripheral.\n\n'
+         'Staged thermostat: 1, 2, or 3 relays on depending on how far\n'
+         'below the setpoint the room is. 2 °F deadband, 15 s minimum\n'
+         'on/off per bank, wear leveling by cycle count and runtime.\n'
+         'The encoder button uses the internal pull-up. Firmware in\n'
+         'PlatformIO and ESPHome forms.')
     d.save(f'{OUT}/sauna-schematic.svg'); print('sauna ok')
 
 def salt():
     d = new()
     esp = d.add(box('ESP32 DevKit  (ESPHome)', (3.6, 4.0), left=['VIN', 'GND'], right=['GPIO23', 'GPIO22'], spacing=1.0).at((0, 0)))
     v5(d, P(esp, 'VIN')); gnd(d, P(esp, 'GND'))
-    hc = d.add(box('HC-SR04 ultrasonic', (3.2, 3.6), left=['VCC', 'TRIG', 'ECHO', 'GND'], spacing=0.8).at((10.0, 0.2)))
+    hc = d.add(box('HC-SR04 ultrasonic', (3.2, 3.6), left=['VCC', 'TRIG', 'ECHO', 'GND'], spacing=0.8).at((9.0, 0.2)))
     v5(d, P(hc, 'VCC')); gnd(d, P(hc, 'GND'))
     jog(d, P(esp, 'GPIO23'), P(hc, 'TRIG'), 6.0)
-    d.add(elm.Label().at((6.1, P(hc, 'TRIG').y + 0.25)).label('TRIG, 3.3 V is enough', fontsize=8.5, halign='left', color=SIG))
-    # ECHO through R1 to node, R2 to ground, node to GPIO22
-    echo = P(hc, 'ECHO')
-    r1 = d.add(elm.Resistor().at(echo).left().length(2.2).label('R1  1 kΩ', fontsize=8.5, ofst=0.2))
-    node = r1.end; dot(d, node)
-    r2 = d.add(elm.Resistor().at(node).down().length(1.8).label('R2  2 kΩ', fontsize=8.5, loc='right', ofst=0.15))
-    gnd(d, r2.end)
-    jog(d, P(esp, 'GPIO22'), node, 5.4)
-    d.add(elm.Label().at((4.4, P(esp, 'GPIO22').y - 0.3)).label('ECHO, divided to 3.3 V', fontsize=8.5, halign='left', valign='top', color=SIG))
-    note(d, (0, -2.6),
-         'ECHO idles at 5 V; R1/R2 bring it to 3.3 V for GPIO22. Sensor faces straight down from the\n'
-         'brine tank lid, above the highest brine level. In the YAML, 30 cm = full and 50 cm = empty;\n'
-         'measure your own tank and change both numbers.')
+    d.add(elm.Label().at((6.1, P(hc, 'TRIG').y + 0.25)).label('TRIG', fontsize=8.5, halign='left', color=SIG))
+    jog(d, P(esp, 'GPIO22'), P(hc, 'ECHO'), 5.4)
+    d.add(elm.Label().at((5.5, P(hc, 'ECHO').y + 0.25)).label('ECHO, wired direct', fontsize=8.5, halign='left', color=SIG))
+    note(d, (0, -2.4),
+         'ECHO is a 5 V output driven straight into GPIO22, which is out of spec for the ESP32 but has run\n'
+         'since February 2026 without trouble. A 1 kΩ / 2 kΩ divider on ECHO is the by-the-book version.\n'
+         'Sensor faces straight down from the brine tank lid, above the highest brine level. In the YAML,\n'
+         '30 cm = full and 50 cm = empty; measure your own tank and change both numbers.')
     d.save(f'{OUT}/salt-schematic.svg'); print('salt ok')
 
 def imac():

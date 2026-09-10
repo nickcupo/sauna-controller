@@ -44,9 +44,9 @@ Rules that protect the bulbs (PlatformIO firmware):
 | DS18B20 probe, 4.7 kΩ pull-up to 3V3 | GPIO15 |
 | SSD1306 128×64 OLED, I²C | SDA GPIO21, SCL GPIO22 |
 | KY-040 rotary encoder | CLK GPIO25, DT GPIO26, SW GPIO27 |
-| 3-channel 10 A relay module | IN1 GPIO12, IN2 GPIO13, IN3 GPIO14 |
+| 3 × single-channel 5 V relay modules, 10 A | IN: GPIO12, GPIO13, GPIO14 |
 
-Each relay switches two 250 W bulbs, about 4.2 A at 120 V. Mains side: 14 AWG,
+Each relay breaks only the hot line to its pair of 250 W bulbs, about 4.2 A at 120 V; neutral runs straight to the bulbs. Mains side: 14 AWG,
 grounded metal enclosure, breaker sized for the load, low-voltage wiring kept apart
 from the 120 V side. Do this part properly or not at all.
 
