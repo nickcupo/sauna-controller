@@ -1,0 +1,5 @@
+esphome/secrets.yaml
+esphome/.esphome/
+firmware/include/secrets.h
+firmware/.pio/
+.DS_Store
