@@ -41,7 +41,7 @@ Rules that protect the bulbs (PlatformIO firmware):
 
 | Part | Pin |
 |---|---|
-| DS18B20 probe, 4.7 kΩ pull-up to 3V3 | GPIO15 |
+| DS18B20 probe on adapter board (pull-up on the board) | GPIO15 |
 | SSD1306 128×64 OLED, I²C | SDA GPIO21, SCL GPIO22 |
 | KY-040 rotary encoder | CLK GPIO25, DT GPIO26, SW GPIO27 |
 | 3 × single-channel 5 V relay modules, 10 A | IN: GPIO12, GPIO13, GPIO14 |

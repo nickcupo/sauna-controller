@@ -126,7 +126,7 @@ def sauna():
         tag_out(d, P(esp, pin), net)
     # Peripherals, each wired by net name. Supply pin on top, ground at the bottom.
     X = 10.0
-    ds = d.add(box('DS18B20 probe', (3.0, 2.4), left=['VDD', 'DQ', 'GND'], spacing=0.7).at((X, 7.6)))
+    ds = d.add(box('DS18B20 probe on adapter board', (3.4, 2.4), left=['VCC', 'DAT', 'GND'], spacing=0.7).at((X, 7.6)))
     oled = d.add(box('SSD1306 OLED, I²C', (3.0, 2.9), left=['VCC', 'SDA', 'SCL', 'GND'], spacing=0.7).at((X, 3.6)))
     enc = d.add(box('KY-040 rotary encoder', (3.0, 3.6), left=['+', 'CLK', 'DT', 'SW', 'GND'], spacing=0.7).at((X, -1.2)))
     # Three single relay modules. Each one only breaks the hot line to its pair of bulbs.
@@ -136,17 +136,13 @@ def sauna():
         r = d.add(box(f'Relay {i+1}, 5 V coil, 10 A', (3.4, 2.2), left=['VCC', 'IN', 'GND'], right=['COM', 'NO'], spacing=0.7).at((X, y)))
         v5(d, P(r, 'VCC')); gnd(d, P(r, 'GND')); tag_in(d, P(r, 'IN'), f'RLY{i+1}')
         relays.append(r)
-    v33(d, P(ds, 'VDD')); gnd(d, P(ds, 'GND'))
+
     v33(d, P(oled, 'VCC')); gnd(d, P(oled, 'GND'))
     v33(d, P(enc, '+')); gnd(d, P(enc, 'GND'))
-    # 1-Wire: net label, then the local pull-up to the probe's VDD net
-    dq, vdd = P(ds, 'DQ'), P(ds, 'VDD')
-    node = (dq.x - 1.0, dq.y)
-    line(d, dq, node, color=SIG); dot(d, node)
-    line(d, node, (dq.x - 2.6, dq.y), color=SIG)
-    tag_in(d, (dq.x - 2.6, dq.y), '1-WIRE')
-    r1 = d.add(elm.Resistor().endpoints(node, (node[0], vdd.y)).label('R1  4.7 kΩ', fontsize=8.5, loc='left', ofst=0.35))
-    line(d, (node[0], vdd.y), vdd); dot(d, (vdd.x, vdd.y))
+    # 1-Wire. The adapter board carries the 4.7 kΩ pull-up from DAT to VCC.
+    v33(d, P(ds, 'VCC')); gnd(d, P(ds, 'GND'))
+    tag_in(d, P(ds, 'DAT'), '1-WIRE')
+    d.add(elm.Label().at((ds.center.x + 1.2, ds.center.y)).label('4.7 kΩ pull-up\non the board', fontsize=8, halign='center', color=MUTED))
     tag_in(d, P(oled, 'SDA'), 'SDA'); tag_in(d, P(oled, 'SCL'), 'SCL')
     tag_in(d, P(enc, 'CLK'), 'ENC_A'); tag_in(d, P(enc, 'DT'), 'ENC_B'); tag_in(d, P(enc, 'SW'), 'ENC_SW')
     # Mains: one hot line feeds every COM; each NO goes through its bulb pair to neutral.
